@@ -21,6 +21,7 @@ import torchvision.datasets as datasets
 
 import models
 from utils import progress_bar
+import matplotlib.pyplot as plt
 
 parser = argparse.ArgumentParser(description="PyTorch CIFAR10 Training")
 parser.add_argument("--lr", default=0.1, type=float, help="learning rate")
@@ -92,30 +93,26 @@ transform_test = transforms.Compose(
 trainset = datasets.CIFAR10(
     root="~/data", train=True, download=False, transform=transform_train
 )
-# trainloader = torch.utils.data.DataLoader(trainset,
-#                                           batch_size=args.batch_size,
-#                                           shuffle=True, num_workers=8)
-trainloader = torch.utils.data.DataLoader(
-    trainset, batch_size=args.batch_size, shuffle=True
-)
+# trainloader = torch.utils.data.DataLoader(   trainset, batch_size=args.batch_size, shuffle=True)
 
 testset = datasets.CIFAR10(
     root="~/data", train=False, download=False, transform=transform_test
 )
-# testloader = torch.utils.data.DataLoader(testset, batch_size=100,
-#                                          shuffle=False, num_workers=8)
-testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False)
+# testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False)
 
 
 def make_doubly_stochastic(matrix, n=100):
     for _ in range(n):
-        # Row normalization
-        matrix = matrix / matrix.sum(axis=1, keepdims=True)
         # Column normalization
         matrix = matrix / matrix.sum(axis=0, keepdims=True)
+        # Row normalization
+        matrix = matrix / matrix.sum(axis=1, keepdims=True)
+    return matrix
 
 
 def weighted_mixup(x1, y1, normalized_confusion_matrix, alpha=1.0, beta=1.0):
+    print("Starting weighted mixup")
+
     # sort x1 and y1 by class label
     x1 = x1[torch.argsort(y1)]
     y1 = y1[torch.argsort(y1)]
@@ -126,8 +123,8 @@ def weighted_mixup(x1, y1, normalized_confusion_matrix, alpha=1.0, beta=1.0):
 
     x2 = []
     y2 = []
-    x_pool = x1.copy()
-    y_pool = y1.copy()
+    x_pool = x1.detach().clone()
+    y_pool = y1.detach().clone()
 
     for class_label in range(10):
         n_examples = (y1 == class_label).sum()
@@ -135,12 +132,15 @@ def weighted_mixup(x1, y1, normalized_confusion_matrix, alpha=1.0, beta=1.0):
         # Create weights for each example
         class_weights = matrix[class_label]
         example_weights = [class_weights[y_pool[j]] for j in range(x_pool.size()[0])]
-        weights = torch.tensor(example_weights)
-        weights = weights / weights.sum()
+        weights = np.asarray(example_weights).astype(np.float64)
+        weights = torch.tensor(weights / weights.sum())
 
         # Sample examples and remove them from the pool
         sampled_indices = np.random.choice(
-            range(x_pool.size()[0]), n_examples, p=weights, replace=False
+            torch.tensor(range(x_pool.size()[0])),
+            n_examples,
+            p=weights,
+            replace=False,
         )
         unsampled_indices = [
             i for i in range(x_pool.size()[0]) if i not in sampled_indices
@@ -166,8 +166,20 @@ def weighted_mixup(x1, y1, normalized_confusion_matrix, alpha=1.0, beta=1.0):
         x[i] = lam * x1[i] + (1 - lam) * x2[i]
         y[i] = lam * y1[i] + (1 - lam) * y2[i]
 
+    print("Finished weighted mixup")
     return x, y
 
+
+# test weighted_mixup on the entire dataset
+x1, y1 = torch.tensor(trainset.data), torch.tensor(trainset.targets)
+x, y = weighted_mixup(x1, y1, normalized_confusion_matrix, alpha=0.2, beta=0.5)
+# save the first 5 examples
+for i in range(5):
+    img = x[i].numpy()
+    plt.imsave(f"example_{i}.png", img)
+    print(y[i])
+
+0 / 0
 
 # Model
 if args.resume:
