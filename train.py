@@ -103,10 +103,10 @@ testset = datasets.CIFAR10(
 
 def make_doubly_stochastic(matrix, n=100):
     for _ in range(n):
-        # Column normalization
-        matrix = matrix / matrix.sum(axis=0, keepdims=True)
         # Row normalization
         matrix = matrix / matrix.sum(axis=1, keepdims=True)
+        # Column normalization
+        matrix = matrix / matrix.sum(axis=0, keepdims=True)
     return matrix
 
 
