@@ -47,6 +47,7 @@ parser.add_argument(
     type=float,
     help="mixup interpolation coefficient (default: 1)",
 )
+parser.add_argument("--variant", default="mixup", type=str, help="variant of mixup")
 args = parser.parse_args()
 
 use_cuda = torch.cuda.is_available()
@@ -56,6 +57,10 @@ start_epoch = 0  # start from epoch 0 or last checkpoint epoch
 
 if args.seed != 0:
     torch.manual_seed(args.seed)
+
+# Confusion matrix (used when variant=="weighted-mixup")
+# initialized to EV of a random classifer
+confusion_matrix = 1 / 10 * torch.ones(10, 10)
 
 # Data
 print("==> Preparing data..")
@@ -100,6 +105,68 @@ testset = datasets.CIFAR10(
 # testloader = torch.utils.data.DataLoader(testset, batch_size=100,
 #                                          shuffle=False, num_workers=8)
 testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False)
+
+
+def make_doubly_stochastic(matrix, n=100):
+    for _ in range(n):
+        # Row normalization
+        matrix = matrix / matrix.sum(axis=1, keepdims=True)
+        # Column normalization
+        matrix = matrix / matrix.sum(axis=0, keepdims=True)
+
+
+def weighted_mixup(x1, y1, normalized_confusion_matrix, alpha=1.0, beta=1.0):
+    # sort x1 and y1 by class label
+    x1 = x1[torch.argsort(y1)]
+    y1 = y1[torch.argsort(y1)]
+
+    # Raise the confusion matrix to the power of beta (element-wise) and normalize it
+    matrix = normalized_confusion_matrix**beta
+    matrix = make_doubly_stochastic(matrix)
+
+    x2 = []
+    y2 = []
+    x_pool = x1.copy()
+    y_pool = y1.copy()
+
+    for class_label in range(10):
+        n_examples = (y1 == class_label).sum()
+
+        # Create weights for each example
+        class_weights = matrix[class_label]
+        example_weights = [class_weights[y_pool[j]] for j in range(x_pool.size()[0])]
+        weights = torch.tensor(example_weights)
+        weights = weights / weights.sum()
+
+        # Sample examples and remove them from the pool
+        sampled_indices = np.random.choice(
+            range(x_pool.size()[0]), n_examples, p=weights, replace=False
+        )
+        unsampled_indices = [
+            i for i in range(x_pool.size()[0]) if i not in sampled_indices
+        ]
+
+        x2.extend(x_pool[sampled_indices])
+        y2.extend(y_pool[sampled_indices])
+        x_pool = x_pool[unsampled_indices]
+        y_pool = y_pool[unsampled_indices]
+
+    x2 = torch.tensor(x2)
+    y2 = torch.tensor(y2)
+
+    # one hot encode y1 and y2
+    y1 = torch.nn.functional.one_hot(y1, 10)
+    y2 = torch.nn.functional.one_hot(y2, 10)
+
+    # Mix x1 and x2, y1 and y2
+    x = torch.zeros_like(x1)
+    y = torch.zeros_like(y1)
+    for i in range(x1.size()[0]):
+        lam = np.random.beta(alpha, alpha)
+        x[i] = lam * x1[i] + (1 - lam) * x2[i]
+        y[i] = lam * y1[i] + (1 - lam) * y2[i]
+
+    return x, y
 
 
 # Model
