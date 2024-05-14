@@ -60,7 +60,7 @@ if args.seed != 0:
 
 # Confusion matrix (used when variant=="weighted-mixup")
 # initialized to EV of a random classifer
-confusion_matrix = 1 / 10 * torch.ones(10, 10)
+normalized_confusion_matrix = 1 / 10 * torch.ones(10, 10)
 
 # Data
 print("==> Preparing data..")
