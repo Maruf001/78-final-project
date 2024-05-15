@@ -22,6 +22,9 @@ import torchvision.datasets as datasets
 import models
 from utils import progress_bar
 
+from StratifiedSampler import StratifiedSampler
+from torch.utils.data import DataLoader
+
 parser = argparse.ArgumentParser(description="PyTorch CIFAR10 Training")
 parser.add_argument("--lr", default=0.1, type=float, help="learning rate")
 parser.add_argument(
@@ -46,6 +49,12 @@ parser.add_argument(
     default=1.0,
     type=float,
     help="mixup interpolation coefficient (default: 1)",
+)
+parser.add_argument(
+    "--beta",
+    default=1.0,
+    type=float,
+    help="weighted mixup regularizing coefficient (default: 1)",
 )
 args = parser.parse_args()
 
@@ -87,12 +96,10 @@ transform_test = transforms.Compose(
 trainset = datasets.CIFAR10(
     root="~/data", train=True, download=False, transform=transform_train
 )
-# trainloader = torch.utils.data.DataLoader(trainset,
-#                                           batch_size=args.batch_size,
-#                                           shuffle=True, num_workers=8)
-trainloader = torch.utils.data.DataLoader(
-    trainset, batch_size=args.batch_size, shuffle=True
-)
+
+# Use a custom stratified data loaded to ensure that the class distribution is the same in each batch
+sampler = StratifiedSampler(trainset, batch_size=args.batch_size)
+trainloader = DataLoader(trainset, batch_sampler=sampler)
 
 testset = datasets.CIFAR10(
     root="~/data", train=False, download=False, transform=transform_test
@@ -160,8 +167,54 @@ def mixup_data(x, y, alpha=1.0, use_cuda=True):
     return mixed_x, y_a, y_b, lam
 
 
+def make_doubly_stochastic(matrix, n=100):
+    """Convert a matrix to a doubly stochastic matrix using Sinkhorn-Knopp algorithm."""
+    for _ in range(n):
+        # Row normalization
+        matrix = matrix / matrix.sum(axis=1, keepdims=True)
+        # Column normalization
+        matrix = matrix / matrix.sum(axis=0, keepdims=True)
+    return matrix
+
+
+def weighted_mixup_data(x1, y1, cm, alpha=1.0, beta=1.0, use_cuda=True):
+    batch_size = x1.size()[0]
+
+    # Raise the confusion matrix to the power of beta (element-wise) and normalize it
+    matrix = normalized_confusion_matrix**beta
+    matrix = make_doubly_stochastic(matrix)
+
+    x2_idx = []
+    remaining_indices = list(range(batch_size))
+    for class_label in range(10):
+        # Create weights for each remaining example
+        example_weights = [matrix[class_label][y1[j]] for j in remaining_indices]
+        weights = np.asarray(example_weights).astype(np.float64)  # float64 precision
+        weights = weights / weights.sum()
+
+        # Sample examples without replacement
+        sampled_indices = np.random.choice(
+            remaining_indices, batch_size // 10, p=weights, replace=False
+        )
+        x2_idx.extend(sampled_indices)
+        remaining_indices = [j for j in remaining_indices if j not in sampled_indices]
+
+    x2 = x1[x2_idx]
+    y2 = y1[x2_idx]
+
+    # Mix x1 and x2
+    lam = np.random.beta(alpha, alpha)
+    mixed_x = lam * x1 + (1 - lam) * x2
+
+    return mixed_x, y1, y2, lam
+
+
 def mixup_criterion(criterion, pred, y_a, y_b, lam):
     return lam * criterion(pred, y_a) + (1 - lam) * criterion(pred, y_b)
+
+
+# Confusion matrix initialized to EV of a random classifer
+normalized_confusion_matrix = 1 / 10 * torch.ones(10, 10)
 
 
 def train(epoch):
@@ -171,11 +224,25 @@ def train(epoch):
     reg_loss = 0
     correct = 0
     total = 0
+
     for batch_idx, (inputs, targets) in enumerate(trainloader):
+        # ---------- ASSERT THAT THE BATCH IS STRATIFIED ----------
+        unique_targets = set(targets.tolist())
+        assert (
+            len(unique_targets) == 10
+        ), "Batch should contain samples from all classes"
+        assert all(
+            [
+                targets.tolist().count(label) == args.batch_size // 10
+                for label in unique_targets
+            ]
+        ), "Each class should have the same number of samples in the batch"
+        ## ---------- END OF ASSERTION ----------
+
         if use_cuda:
             inputs, targets = inputs.cuda(), targets.cuda()
 
-        inputs, targets_a, targets_b, lam = mixup_data(
+        inputs, targets_a, targets_b, lam = weighted_mixup_data(  # mixup_data(
             inputs, targets, args.alpha, use_cuda
         )
         inputs, targets_a, targets_b = map(Variable, (inputs, targets_a, targets_b))
