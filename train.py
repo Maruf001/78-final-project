@@ -127,17 +127,17 @@ def weighted_mixup(x1, y1, normalized_confusion_matrix, alpha=1.0, beta=1.0):
     y_pool = y1.detach().clone()
 
     for class_label in range(10):
-        n_examples = (y1 == class_label).sum()
+        n_examples = (y1 == class_label).sum().item()
 
         # Create weights for each example
         class_weights = matrix[class_label]
         example_weights = [class_weights[y_pool[j]] for j in range(x_pool.size()[0])]
-        weights = np.asarray(example_weights).astype(np.float64)
-        weights = torch.tensor(weights / weights.sum())
+        weights = np.asarray(example_weights).astype(np.float64)  # float64 precision
+        weights = weights / weights.sum()
 
         # Sample examples and remove them from the pool
         sampled_indices = np.random.choice(
-            torch.tensor(range(x_pool.size()[0])),
+            range(x_pool.size()[0]),
             n_examples,
             p=weights,
             replace=False,
@@ -151,8 +151,8 @@ def weighted_mixup(x1, y1, normalized_confusion_matrix, alpha=1.0, beta=1.0):
         x_pool = x_pool[unsampled_indices]
         y_pool = y_pool[unsampled_indices]
 
-    x2 = torch.tensor(x2)
-    y2 = torch.tensor(y2)
+    x2 = torch.tensor(np.array(x2))
+    y2 = torch.tensor(np.array(y2))
 
     # one hot encode y1 and y2
     y1 = torch.nn.functional.one_hot(y1, 10)
