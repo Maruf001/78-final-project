@@ -17,14 +17,8 @@ import torch.optim as optim
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import models
-from utils import progress_bar
 from StratifiedSampler import StratifiedSampler
 from torch.utils.data import DataLoader
-
-# TODO make the model save the confusion matrix at the end of each epoch
-# TODO put cm in use
-# TODO make the confusion matrix use exponential moving average with momentum = 0.9
-# TODO make the confusion matrix exclude the 2 classes being mixed up in each y_pred
 
 
 def train_cifar10(
@@ -34,13 +28,17 @@ def train_cifar10(
     name="0",  # name of run
     seed=0,  # random seed
     batch_size=250,  # batch size
-    epoch=100,  # total epochs to run
+    n_epochs=100,  # total epochs to run
     augment=True,  # use standard augmentation
     decay=1e-4,  # weight decay
     mixup="standard",  # mixup type, either "standard", "weighted", or "erm"
     alpha=1.0,  # mixup interpolation coefficient
     gamma=1.0,  # weighted mixup regularizing coefficient
+    mu=0.9,  # confusion matrix exponential moving average momentum
+    live=False,  # print live progress bar
 ):
+    if live:
+        from utils import progress_bar
 
     torch.manual_seed(seed)
     use_cuda = torch.cuda.is_available()
@@ -189,9 +187,14 @@ def train_cifar10(
 
     # Confusion matrix initialized to EV of a random classifer
     cm = 1 / 10 * torch.ones(10, 10)
+    cms_tensor = torch.zeros(10, 10, n_epochs)
 
     def train(epoch):
-        nonlocal best_acc, cm
+        nonlocal best_acc, cm, cms_tensor
+        epoch_cm = torch.zeros_like(cm)
+
+        # store the confusion matrix used for each epoch
+        cms_tensor[:, :, epoch] = cm
 
         print("\nEpoch: %d" % epoch)
         net.train()
@@ -248,30 +251,43 @@ def train_cifar10(
             predicted_softmax = torch.nn.functional.softmax(outputs.data, dim=1)
 
             # put expected labels for the batch into a matrix
+            # use += in case targets_a[i] == targets_b[i]
             expected = torch.zeros_like(outputs)
             for i in range(targets_a.size(0)):
-                expected[i][targets_a[i]] = lam
-                expected[i][targets_b[i]] = 1 - lam
+                expected[i][targets_a[i]] += lam
+                expected[i][targets_b[i]] += 1 - lam
 
-            # calculate confusion matrix (turn into double stochastic matrix at end of epoch)
-            cm += predicted_softmax.t().cpu() @ expected.cpu()
+            # set the predicted value for any class that is being mixed up to 0
+            for i in range(targets_a.size(0)):
+                predicted_softmax[i][targets_a[i]] = 0
+                predicted_softmax[i][targets_b[i]] = 0
+
+            # calculate epoch confusion matrix
+            epoch_cm += torch.matmul(expected.cpu().t(), predicted_softmax.cpu())
             # ----------- Confusion matrix (end) --------------
 
-            progress_bar(
-                batch_idx,
-                len(trainloader),
-                "Loss: %.3f | Reg: %.5f | Acc: %.3f%% (%d/%d)"
-                % (
-                    train_loss / (batch_idx + 1),
-                    reg_loss / (batch_idx + 1),
-                    100.0 * correct / total,
-                    correct,
-                    total,
-                ),
-            )
+            if live:
+                progress_bar(
+                    batch_idx,
+                    len(trainloader),
+                    "Loss: %.3f | Reg: %.5f | Acc: %.3f%% (%d/%d)"
+                    % (
+                        train_loss / (batch_idx + 1),
+                        reg_loss / (batch_idx + 1),
+                        100.0 * correct / total,
+                        correct,
+                        total,
+                    ),
+                )
 
         # ----------- Confusion matrix (start) --------------
-        cm = cm / cm.sum(axis=1, keepdims=True)  # turn into double stochastic matrix
+        # turn each row into a probability distribution
+        epoch_cm = 0.9 * epoch_cm / epoch_cm.sum(axis=1, keepdims=True)
+        # make the diagonal have probability 0.1
+        epoch_cm = epoch_cm + 0.1 * torch.eye(10)
+        # compute the exponential moving average
+        cm = mu * cm + (1 - mu) * epoch_cm
+
         print("cm after epoch", epoch, cm)
         # ----------- Confusion matrix (end) --------------
 
@@ -296,18 +312,19 @@ def train_cifar10(
             _, predicted = torch.max(outputs.data, 1)
             total += targets.size(0)
             correct += predicted.eq(targets.data).cpu().sum()
+            if live:
+                progress_bar(
+                    batch_idx,
+                    len(testloader),
+                    "Loss: %.3f | Acc: %.3f%% (%d/%d)"
+                    % (
+                        test_loss / (batch_idx + 1),
+                        100.0 * correct / total,
+                        correct,
+                        total,
+                    ),
+                )
 
-            progress_bar(
-                batch_idx,
-                len(testloader),
-                "Loss: %.3f | Acc: %.3f%% (%d/%d)"
-                % (
-                    test_loss / (batch_idx + 1),
-                    100.0 * correct / total,
-                    correct,
-                    total,
-                ),
-            )
         acc = 100.0 * correct / total
         checkpoint(epoch)
         if acc > best_acc:
@@ -332,7 +349,7 @@ def train_cifar10(
 
     def adjust_learning_rate(optimizer, epoch):
         nonlocal lr
-        if epoch == 75:
+        if epoch == 50 or epoch == 75:
             lr /= 10
         for param_group in optimizer.param_groups:
             param_group["lr"] = lr
@@ -351,7 +368,7 @@ def train_cifar10(
                 ]
             )
 
-    for epoch in range(start_epoch, epoch):
+    for epoch in range(start_epoch, n_epochs):
         train_loss, reg_loss, train_acc = train(epoch)
         print("done training epoch")
         test_loss, test_acc = test(epoch)
@@ -362,6 +379,17 @@ def train_cifar10(
                 [epoch, train_loss, reg_loss, train_acc, test_loss, test_acc]
             )
 
+    # save the confusion matrices
+    torch.save(cms_tensor, f"results/cm_{name}_{model}_{mixup}_{gamma}.pt")
+
 
 if __name__ == "__main__":
+    '''
     train_cifar10(mixup="weighted", gamma=0.5)
+    train_cifar10(mixup="weighted", gamma=0.125)
+    train_cifar10(mixup="weighted", gamma=0.25)
+    train_cifar10(mixup="weighted", gamma=1)
+    train_cifar10(mixup="weighted", gamma=2)
+    train_cifar10(mixup="standard")
+    train_cifar10(mixup="erm")
+    '''
