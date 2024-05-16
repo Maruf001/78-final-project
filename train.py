@@ -4,12 +4,10 @@
 #
 # This source code is licensed under the license found in the LICENSE file in
 # the root directory of this source tree.
-from __future__ import print_function
 
-import argparse
+
 import csv
 import os
-
 import numpy as np
 import torch
 from torch.autograd import Variable
@@ -18,79 +16,15 @@ import torch.nn as nn
 import torch.optim as optim
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
-
 import models
 from utils import progress_bar
-
 from StratifiedSampler import StratifiedSampler
 from torch.utils.data import DataLoader
 
 # TODO make the model save the confusion matrix at the end of each epoch
-# TODO make the model save the model at the end of each epoch
 # TODO put cm in use
-
-
-def standard_mixup(x, y, alpha=1.0, use_cuda=True):
-    """Returns mixed inputs, pairs of targets, and lambda"""
-    if alpha > 0:
-        lam = np.random.beta(alpha, alpha)
-    else:
-        lam = 1
-
-    batch_size = x.size()[0]
-    if use_cuda:
-        index = torch.randperm(batch_size).cuda()
-    else:
-        index = torch.randperm(batch_size)
-
-    mixed_x = lam * x + (1 - lam) * x[index, :]
-    y_a, y_b = y, y[index]
-    return mixed_x, y_a, y_b, lam
-
-
-def make_doubly_stochastic(matrix, n=100):
-    """Convert a matrix to a doubly stochastic matrix using Sinkhorn-Knopp algorithm."""
-    for _ in range(n):
-        # Row normalization
-        matrix = matrix / matrix.sum(axis=1, keepdims=True)
-        # Column normalization
-        matrix = matrix / matrix.sum(axis=0, keepdims=True)
-    return matrix
-
-
-def weighted_mixup(x1, y1, cm, alpha, gamma, use_cuda=True):
-    batch_size = x1.size()[0]
-
-    # Raise the confusion matrix to the power of gamma (element-wise) and normalize it
-    matrix = cm**gamma
-    matrix = make_doubly_stochastic(matrix)
-
-    x2_idx = []
-    remaining_indices = list(range(batch_size))
-    for class_label in range(10):
-        # Create weights for each remaining example
-        example_weights = [matrix[class_label][y1[j]] for j in remaining_indices]
-        weights = np.asarray(example_weights).astype(np.float64)  # float64 precision
-        weights = weights / weights.sum()
-
-        # Sample examples without replacement
-        sampled_indices = np.random.choice(
-            remaining_indices, batch_size // 10, p=weights, replace=False
-        )
-        x2_idx.extend(sampled_indices)
-        remaining_indices = [j for j in remaining_indices if j not in sampled_indices]
-
-    if use_cuda:
-        x2_idx = torch.LongTensor(x2_idx).cuda()
-
-    x2 = x1[x2_idx]
-    y2 = y1[x2_idx]
-
-    # Mix x1 and x2
-    lam = np.random.beta(alpha, alpha)
-    mixed_x = lam * x1 + (1 - lam) * x2
-
-    return mixed_x, y1, y2, lam
+# TODO make the confusion matrix use exponential moving average with momentum = 0.9
+# TODO make the confusion matrix exclude the 2 classes being mixed up in each y_pred
 
 
 def train_cifar10(
@@ -104,7 +38,7 @@ def train_cifar10(
     augment=True,  # use standard augmentation
     decay=1e-4,  # weight decay
     mixup="standard",  # mixup type, either "standard", "weighted", or "erm"
-    alpha=0.2,  # mixup interpolation coefficient
+    alpha=1.0,  # mixup interpolation coefficient
     gamma=1.0,  # weighted mixup regularizing coefficient
 ):
 
@@ -174,9 +108,7 @@ def train_cifar10(
 
     if not os.path.isdir("results"):
         os.mkdir("results")
-    logname = (
-        "results/log_" + net.__class__.__name__ + "_" + name + "_" + str(seed) + ".csv"
-    )
+    logname = f"results/log_{name}_{model}_{mixup}_{gamma}.csv"
 
     if use_cuda:
         net.cuda()
@@ -190,6 +122,70 @@ def train_cifar10(
 
     def mixup_criterion(criterion, pred, y_a, y_b, lam):
         return lam * criterion(pred, y_a) + (1 - lam) * criterion(pred, y_b)
+
+    def standard_mixup(x, y, alpha, use_cuda=True):
+        """Returns mixed inputs, pairs of targets, and lambda"""
+        if alpha > 0:
+            lam = np.random.beta(alpha, alpha)
+        else:
+            lam = 1
+
+        batch_size = x.size()[0]
+        if use_cuda:
+            index = torch.randperm(batch_size).cuda()
+        else:
+            index = torch.randperm(batch_size)
+
+        mixed_x = lam * x + (1 - lam) * x[index, :]
+        y_a, y_b = y, y[index]
+        return mixed_x, y_a, y_b, lam
+
+    def make_doubly_stochastic(matrix, n=100):
+        """Convert a matrix to a doubly stochastic matrix using Sinkhorn-Knopp algorithm."""
+        for _ in range(n):
+            # Row normalization
+            matrix = matrix / matrix.sum(axis=1, keepdims=True)
+            # Column normalization
+            matrix = matrix / matrix.sum(axis=0, keepdims=True)
+        return matrix
+
+    def weighted_mixup(x1, y1, cm, alpha, gamma, use_cuda=True):
+        batch_size = x1.size()[0]
+
+        # Raise the confusion matrix to the power of gamma (element-wise) and normalize it
+        matrix = cm**gamma
+        matrix = make_doubly_stochastic(matrix)
+
+        x2_idx = []
+        remaining_indices = list(range(batch_size))
+        for class_label in range(10):
+            # Create weights for each remaining example
+            example_weights = [matrix[class_label][y1[j]] for j in remaining_indices]
+            weights = np.asarray(example_weights).astype(
+                np.float64
+            )  # float64 precision
+            weights = weights / weights.sum()
+
+            # Sample examples without replacement
+            sampled_indices = np.random.choice(
+                remaining_indices, batch_size // 10, p=weights, replace=False
+            )
+            x2_idx.extend(sampled_indices)
+            remaining_indices = [
+                j for j in remaining_indices if j not in sampled_indices
+            ]
+
+        if use_cuda:
+            x2_idx = torch.LongTensor(x2_idx).cuda()
+
+        x2 = x1[x2_idx]
+        y2 = y1[x2_idx]
+
+        # Mix x1 and x2
+        lam = np.random.beta(alpha, alpha)
+        mixed_x = lam * x1 + (1 - lam) * x2
+
+        return mixed_x, y1, y2, lam
 
     # Confusion matrix initialized to EV of a random classifer
     cm = 1 / 10 * torch.ones(10, 10)
@@ -279,7 +275,8 @@ def train_cifar10(
         print("cm after epoch", epoch, cm)
         # ----------- Confusion matrix (end) --------------
 
-        return (train_loss / batch_idx, reg_loss / batch_idx, 100.0 * correct / total)
+        train_acc = (100.0 * correct / total).item()
+        return (train_loss / batch_idx, reg_loss / batch_idx, train_acc)
 
     def test(epoch):
         nonlocal best_acc
@@ -312,35 +309,30 @@ def train_cifar10(
                 ),
             )
         acc = 100.0 * correct / total
-        if epoch == start_epoch + epoch - 1 or acc > best_acc:
-            checkpoint(acc, epoch)
+        checkpoint(epoch)
         if acc > best_acc:
             best_acc = acc
 
         test_loss = test_loss / batch_idx
-        test_acc = 100.0 * correct / total
+        test_acc = (100.0 * correct / total).item()
         return test_loss, test_acc
 
-    def checkpoint(acc, epoch):
-        # Save checkpoint.
+    def checkpoint(epoch):
         print("Saving..")
         state = {
             "net": net,
-            "acc": acc,
             "epoch": epoch,
             "rng_state": torch.get_rng_state(),
         }
         if not os.path.isdir("checkpoint"):
             os.mkdir("checkpoint")
-        torch.save(state, "./checkpoint/ckpt.t7" + name + "_" + str(seed))
+        torch.save(
+            state, f"./checkpoint/ckpt.t7_{name}_{model}_{mixup}_{gamma}_{epoch}"
+        )
 
     def adjust_learning_rate(optimizer, epoch):
         nonlocal lr
-
-        """decrease the learning rate at 100 and 150 epoch"""
-        if epoch >= 100:
-            lr /= 10
-        if epoch >= 150:
+        if epoch == 75:
             lr /= 10
         for param_group in optimizer.param_groups:
             param_group["lr"] = lr
