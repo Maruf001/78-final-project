@@ -219,6 +219,9 @@ normalized_confusion_matrix = 1 / 10 * torch.ones(10, 10)
 
 def train(epoch):
     print("\nEpoch: %d" % epoch)
+    # ----------- Confusion matrix (start) --------------
+    cm = torch.zeros(10, 10)
+    # ----------- Confusion matrix (end) --------------
     net.train()
     train_loss = 0
     reg_loss = 0
@@ -260,6 +263,20 @@ def train(epoch):
         loss.backward()
         optimizer.step()
 
+        # ----------- Confusion matrix (start) --------------
+        # convert NN output to a probability distribution
+        predicted_softmax = torch.nn.functional.softmax(outputs.data, dim=1)
+
+        # put expected labels for the batch into a matrix
+        expected = torch.zeros_like(outputs)
+        for i in range(targets_a.size(0)):
+            expected[i][targets_a[i]] = lam
+            expected[i][targets_b[i]] = 1 - lam
+
+        # calculate confusion matrix (turn into double stochastic matrix at end of epoch)
+        cm += predicted_softmax.t() @ expected
+        # ----------- Confusion matrix (end) --------------
+
         progress_bar(
             batch_idx,
             len(trainloader),
@@ -272,6 +289,12 @@ def train(epoch):
                 total,
             ),
         )
+
+    # ----------- Confusion matrix (start) --------------
+    cm = cm / cm.sum(axis=1, keepdims=True)  # turn into double stochastic matrix
+    print("cm after epoch", epoch, cm)
+    # ----------- Confusion matrix (end) --------------
+
     return (train_loss / batch_idx, reg_loss / batch_idx, 100.0 * correct / total)
 
 
