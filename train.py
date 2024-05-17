@@ -384,12 +384,15 @@ def train_cifar10(
 
 
 if __name__ == "__main__":
-    '''
-    train_cifar10(mixup="weighted", gamma=0.5)
-    train_cifar10(mixup="weighted", gamma=0.125)
-    train_cifar10(mixup="weighted", gamma=0.25)
-    train_cifar10(mixup="weighted", gamma=1)
-    train_cifar10(mixup="weighted", gamma=2)
-    train_cifar10(mixup="standard")
-    train_cifar10(mixup="erm")
-    '''
+
+    # train_cifar10(mixup="weighted", gamma=0.5)
+    # train_cifar10(mixup="weighted", gamma=0.125)
+    # train_cifar10(mixup="weighted", gamma=0.25)
+    # train_cifar10(mixup="weighted", gamma=1)
+    # train_cifar10(mixup="weighted", gamma=2)
+    train_cifar10(mixup="weighted", gamma=4)
+    train_cifar10(mixup="weighted", gamma=8)
+    train_cifar10(mixup="weighted", gamma=1, mu=0.0)
+    train_cifar10(mixup="weighted", gamma=1, mu=0.5)
+    # train_cifar10(mixup="standard")
+    # train_cifar10(mixup="erm")
