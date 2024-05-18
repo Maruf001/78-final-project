@@ -36,6 +36,7 @@ def train_cifar10(
     gamma=1.0,  # weighted mixup regularizing coefficient
     mu=0.9,  # confusion matrix exponential moving average momentum
     live=False,  # print live progress bar
+    resume_epoch=0,  # resume from epoch
 ):
     if live:
         from utils import progress_bar
@@ -94,9 +95,10 @@ def train_cifar10(
         # Load checkpoint.
         print("==> Resuming from checkpoint..")
         assert os.path.isdir("checkpoint"), "Error: no checkpoint directory found!"
-        checkpoint = torch.load("./checkpoint/ckpt.t7" + name + "_" + str(seed))
+        checkpoint = torch.load(
+            f"./checkpoint/ckpt.t7_{name}_{model}_{mixup}_{gamma}_{resume_epoch}"
+        )
         net = checkpoint["net"]
-        best_acc = checkpoint["acc"]
         start_epoch = checkpoint["epoch"] + 1
         rng_state = checkpoint["rng_state"]
         torch.set_rng_state(rng_state)
@@ -384,17 +386,22 @@ def train_cifar10(
 
 
 if __name__ == "__main__":
-
+    # train_cifar10(mixup="standard")
     # train_cifar10(mixup="weighted", gamma=0.5)
-    # train_cifar10(mixup="weighted", gamma=0.125)
     # train_cifar10(mixup="weighted", gamma=0.25)
+    # train_cifar10(mixup="weighted", gamma=0.125)
     # train_cifar10(mixup="weighted", gamma=1)
     # train_cifar10(mixup="weighted", gamma=2)
     # train_cifar10(mixup="weighted", gamma=4)
     # train_cifar10(mixup="weighted", gamma=8)
-    train_cifar10(mixup="weighted", name="mu0", gamma=1, mu=0.0)
-    train_cifar10(mixup="weighted", name="mu05", gamma=1, mu=0.5)
-    # train_cifar10(mixup="standard")
-    # train_cifar10(mixup="erm", name="decay1e-4", decay=1e-4)
-    # train_cifar10(mixup="erm", name="decay1e-3", decay=1e-3)
     # train_cifar10(mixup="erm", name="decay1e-2", decay=1e-2)
+    # train_cifar10(mixup="erm", name="decay1e-3", decay=1e-3)
+    # train_cifar10(mixup="erm", name="decay1e-4", decay=1e-4)
+    # train_cifar10(mixup="weighted", name="mu0", gamma=1, mu=0.0)
+    # train_cifar10(mixup="weighted", name="mu05", gamma=1, mu=0.5)
+    # train_cifar10(mixup="weighted", name="mu0", gamma=0.125, mu=0.0)
+    # train_cifar10(mixup="weighted", name="mu05", gamma=0.125, mu=0.5)
+    # train_cifar10(mixup="weighted", name="mu0", gamma=0.25, mu=0.0)
+    train_cifar10(mixup="weighted", name="mu05", gamma=0.25, mu=0.5)
+    train_cifar10(mixup="weighted", name="mu0", gamma=0.5, mu=0.0)
+    train_cifar10(mixup="weighted", name="mu05", gamma=0.5, mu=0.5)
