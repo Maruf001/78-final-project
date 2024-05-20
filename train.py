@@ -407,5 +407,6 @@ if __name__ == "__main__":
     # train_cifar10(mixup="weighted", name="mu05", gamma=0.5, mu=0.5)
     # train_cifar10(mixup="weighted", name="mu05_alpha02", gamma=1, mu=0.5, alpha=0.2)
     # train_cifar10(mixup="standard", name="alpha02", alpha=0.2)
-    train_cifar10(mixup="weighted", name="mu05_alpha01", gamma=1, mu=0.5, alpha=0.1)
-    train_cifar10(mixup="standard", name="alpha01", alpha=0.1)
+    # train_cifar10(mixup="weighted", name="mu05_alpha01", gamma=1, mu=0.5, alpha=0.1)
+    # train_cifar10(mixup="standard", name="alpha01", alpha=0.1)
+    pass
