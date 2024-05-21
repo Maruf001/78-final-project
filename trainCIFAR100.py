@@ -16,18 +16,19 @@ import torch.nn as nn
 import torch.optim as optim
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
-import models
+import cifar100models as models
 from StratifiedSampler import StratifiedSampler
 from torch.utils.data import DataLoader
 
 
-def train_cifar10(
+
+def train_cifar100(
     lr=0.1,  # learning rate
     resume=False,  # resume from checkpoint
     model="ResNet18",  # model type
     name="0",  # name of run
     seed=0,  # random seed
-    batch_size=250,  # batch size
+    batch_size=600,  # batch size
     n_epochs=100,  # total epochs to run
     augment=True,  # use standard augmentation
     decay=1e-4,  # weight decay
@@ -38,6 +39,7 @@ def train_cifar10(
     live=True,  # print live progress bar
     resume_epoch=0,  # resume from epoch
 ):
+    num_classes = 100
     if live:
         from utils import progress_bar
 
@@ -77,8 +79,8 @@ def train_cifar10(
         ]
     )
 
-    trainset = datasets.CIFAR10(
-        root="~/data", train=True, download=False, transform=transform_train
+    trainset = datasets.CIFAR100(
+        root="~/data", train=True, download=True, transform=transform_train
     )
 
 
@@ -86,8 +88,8 @@ def train_cifar10(
     sampler = StratifiedSampler(trainset, batch_size=batch_size)
     trainloader = DataLoader(trainset, batch_sampler=sampler)
 
-    testset = datasets.CIFAR10(
-        root="~/data", train=False, download=False, transform=transform_test
+    testset = datasets.CIFAR100(
+        root="~/data", train=False, download=True, transform=transform_test
     )
     testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False)
 
@@ -159,7 +161,7 @@ def train_cifar10(
 
         x2_idx = []
         remaining_indices = list(range(batch_size))
-        for class_label in range(10):
+        for class_label in range(num_classes):
             # Create weights for each remaining example
             example_weights = [matrix[class_label][y1[j]] for j in remaining_indices]
             weights = np.asarray(example_weights).astype(
@@ -169,7 +171,7 @@ def train_cifar10(
 
             # Sample examples without replacement
             sampled_indices = np.random.choice(
-                remaining_indices, batch_size // 10, p=weights, replace=False
+                remaining_indices, batch_size // num_classes, p=weights, replace=False
             )
             x2_idx.extend(sampled_indices)
             remaining_indices = [
@@ -189,8 +191,8 @@ def train_cifar10(
         return mixed_x, y1, y2, lam
 
     # Confusion matrix initialized to EV of a random classifer
-    cm = 1 / 10 * torch.ones(10, 10)
-    cms_tensor = torch.zeros(10, 10, n_epochs)
+    cm = 1 / num_classes * torch.ones(num_classes, num_classes)
+    cms_tensor = torch.zeros(num_classes, num_classes, n_epochs)
 
     def train(epoch):
         nonlocal best_acc, cm, cms_tensor
@@ -210,11 +212,11 @@ def train_cifar10(
             # ---------- ASSERT THAT THE BATCH IS STRATIFIED ----------
             unique_targets = set(targets.tolist())
             assert (
-                len(unique_targets) == 10
+                len(unique_targets) == num_classes
             ), "Batch should contain samples from all classes"
             assert all(
                 [
-                    targets.tolist().count(label) == batch_size // 10
+                    targets.tolist().count(label) == batch_size // num_classes
                     for label in unique_targets
                 ]
             ), "Each class should have the same number of samples in the batch"
@@ -287,7 +289,7 @@ def train_cifar10(
         # turn each row into a probability distribution
         epoch_cm = 0.9 * epoch_cm / epoch_cm.sum(axis=1, keepdims=True)
         # make the diagonal have probability 0.1
-        epoch_cm = epoch_cm + 0.1 * torch.eye(10)
+        epoch_cm = epoch_cm + 0.1 * torch.eye(num_classes)
         # compute the exponential moving average
         cm = mu * cm + (1 - mu) * epoch_cm
 
@@ -383,18 +385,19 @@ def train_cifar10(
             )
 
     # save the confusion matrices
-    torch.save(cms_tensor, f"results/cm_{name}_{model}_{mixup}_{gamma}.pt")
+    torch.save(cms_tensor, f"cifar100results/cm_{name}_{model}_{mixup}_{gamma}.pt")
 
 
 if __name__ == "__main__":
-    # train_cifar10(mixup="standard")
-    train_cifar10(mixup="weighted", gamma=0.5)
-    # train_cifar10(mixup="weighted", gamma=0.25)
-    # train_cifar10(mixup="weighted", gamma=0.125)
-    # train_cifar10(mixup="weighted", gamma=1)
-    # train_cifar10(mixup="weighted", gamma=2)
-    # train_cifar10(mixup="weighted", gamma=4)
-    # train_cifar10(mixup="weighted", gamma=8)
+    train_cifar100(mixup="standard")
+    train_cifar100(mixup="weighted", gamma=0.5)
+    train_cifar100(mixup="weighted", gamma=0.25)
+    train_cifar100(mixup="weighted", gamma=0.125)
+    train_cifar100(mixup="weighted", gamma=1)
+    train_cifar100(mixup="weighted", gamma=2)
+    train_cifar100(mixup="weighted", gamma=4)
+    train_cifar100(mixup="weighted", gamma=8)
+
     # train_cifar10(mixup="erm", name="decay1e-2", decay=1e-2)
     # train_cifar10(mixup="erm", name="decay1e-3", decay=1e-3)
     # train_cifar10(mixup="erm", name="decay1e-4", decay=1e-4)
