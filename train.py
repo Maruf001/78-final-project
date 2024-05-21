@@ -396,7 +396,7 @@ if __name__ == "__main__":
 
     # train_cifar10(mixup="standard")
 
-    # exponential growth of gamma --> going from low to roughly 1 over training
+    # exponential growth of gamma --> going from low to roughly 1 over training epochs
     train_cifar10(mixup="weighted", gamma=0.25, step_size=20, gamma_growth_factor=1.5, mu=0.0)
     train_cifar10(mixup="weighted", gamma=0.25, step_size=20, gamma_growth_factor=2, mu=0.0)
     
