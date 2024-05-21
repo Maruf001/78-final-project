@@ -37,6 +37,9 @@ def train_cifar100(
     mu=0.9,  # confusion matrix exponential moving average momentum
     live=True,  # print live progress bar
     resume_epoch=0,  # resume from epoch
+    gamma_growth_factor=1.5,  # gamma multiplied by this factor every step_size epochs
+    step_size=20
+
 ):
     num_classes = 100
     if live:
@@ -79,7 +82,7 @@ def train_cifar100(
     )
 
     trainset = datasets.CIFAR100(
-        root="~/data", train=True, download=True, transform=transform_train
+        root="~/data", train=True, download=False, transform=transform_train
     )
 
     # Use a custom stratified data loaded to ensure that the class distribution is the same in each batch
@@ -87,7 +90,7 @@ def train_cifar100(
     trainloader = DataLoader(trainset, batch_sampler=sampler)
 
     testset = datasets.CIFAR100(
-        root="~/data", train=False, download=True, transform=transform_test
+        root="~/data", train=False, download=False, transform=transform_test
     )
     testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False)
 
@@ -103,6 +106,7 @@ def train_cifar100(
         start_epoch = checkpoint["epoch"] + 1
         rng_state = checkpoint["rng_state"]
         torch.set_rng_state(rng_state)
+        gamma **= (start_epoch // step_size + 1)
     else:
         print("==> Building model..")
         net = models.__dict__[model]()
@@ -150,8 +154,11 @@ def train_cifar100(
             matrix = matrix / matrix.sum(axis=0, keepdims=True)
         return matrix
 
-    def weighted_mixup(x1, y1, cm, alpha, gamma, use_cuda=True):
+    def weighted_mixup(x1, y1, cm, alpha, gamma, epoch, use_cuda=True):
         batch_size = x1.size()[0]
+
+        # update gamma if it is time
+        if epoch > 0 and epoch % step_size == 0: gamma *= gamma_growth_factor
 
         # Raise the confusion matrix to the power of gamma (element-wise) and normalize it
         matrix = cm**gamma
@@ -229,7 +236,7 @@ def train_cifar100(
                 )
             elif mixup == "weighted":
                 inputs, targets_a, targets_b, lam = weighted_mixup(
-                    inputs, targets, cm, alpha, gamma, use_cuda
+                    inputs, targets, cm, alpha, gamma, epoch, use_cuda
                 )
             elif mixup == "erm":
                 inputs, targets_a, targets_b, lam = inputs, targets, targets, 1.0
@@ -383,7 +390,7 @@ def train_cifar100(
             )
 
     # save the confusion matrices
-    torch.save(cms_tensor, f"cifar100results/cm_{name}_{model}_{mixup}_{gamma}.pt")
+    torch.save(cms_tensor, f"cifar100results/cm_{name}_{model}_{mixup}_{gamma}_gammagrowth={gamma_growth_factor}_step={step_size}.pt")
 
 
 if __name__ == "__main__":
