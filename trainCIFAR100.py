@@ -21,14 +21,13 @@ from StratifiedSampler import StratifiedSampler
 from torch.utils.data import DataLoader
 
 
-
 def train_cifar100(
     lr=0.1,  # learning rate
     resume=False,  # resume from checkpoint
     model="ResNet18",  # model type
     name="0",  # name of run
     seed=0,  # random seed
-    batch_size=600,  # batch size
+    batch_size=1000,  # batch size
     n_epochs=100,  # total epochs to run
     augment=True,  # use standard augmentation
     decay=1e-4,  # weight decay
@@ -82,7 +81,6 @@ def train_cifar100(
     trainset = datasets.CIFAR100(
         root="~/data", train=True, download=True, transform=transform_train
     )
-
 
     # Use a custom stratified data loaded to ensure that the class distribution is the same in each batch
     sampler = StratifiedSampler(trainset, batch_size=batch_size)
@@ -389,6 +387,7 @@ def train_cifar100(
 
 
 if __name__ == "__main__":
+    train_cifar100(mixup="erm")
     train_cifar100(mixup="standard")
     train_cifar100(mixup="weighted", gamma=0.5)
     train_cifar100(mixup="weighted", gamma=0.25)
