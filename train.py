@@ -33,10 +33,12 @@ def train_cifar10(
     decay=1e-4,  # weight decay
     mixup="standard",  # mixup type, either "standard", "weighted", or "erm"
     alpha=1.0,  # mixup interpolation coefficient
-    gamma=1.0,  # weighted mixup regularizing coefficient
+    gamma=0.125,  # weighted mixup regularizing coefficient
     mu=0.9,  # confusion matrix exponential moving average momentum
     live=True,  # print live progress bar
     resume_epoch=0,  # resume from epoch
+    gamma_growth_factor=1.5,  # gamma multiplied by this factor every step_size epochs
+    step_size=20
 ):
     if live:
         from utils import progress_bar
@@ -103,6 +105,7 @@ def train_cifar10(
         start_epoch = checkpoint["epoch"] + 1
         rng_state = checkpoint["rng_state"]
         torch.set_rng_state(rng_state)
+        gamma **= (start_epoch // step_size + 1)
     else:
         print("==> Building model..")
         net = models.__dict__[model]()
@@ -150,8 +153,11 @@ def train_cifar10(
             matrix = matrix / matrix.sum(axis=0, keepdims=True)
         return matrix
 
-    def weighted_mixup(x1, y1, cm, alpha, gamma, use_cuda=True):
+    def weighted_mixup(x1, y1, cm, alpha, gamma, epoch, use_cuda=True):
         batch_size = x1.size()[0]
+
+        # calculate current gamma
+        if epoch > 0 and epoch % step_size == 0: gamma *= gamma_growth_factor
 
         # Raise the confusion matrix to the power of gamma (element-wise) and normalize it
         matrix = cm**gamma
@@ -229,7 +235,7 @@ def train_cifar10(
                 )
             elif mixup == "weighted":
                 inputs, targets_a, targets_b, lam = weighted_mixup(
-                    inputs, targets, cm, alpha, gamma, use_cuda
+                    inputs, targets, cm, alpha, gamma, epoch, use_cuda
                 )
             elif mixup == "erm":
                 inputs, targets_a, targets_b, lam = inputs, targets, targets, 1.0
@@ -383,12 +389,18 @@ def train_cifar10(
             )
 
     # save the confusion matrices
-    torch.save(cms_tensor, f"results/cm_{name}_{model}_{mixup}_{gamma}.pt")
+    torch.save(cms_tensor, f"results/cm_{name}_{model}_{mixup}_{gamma}_gammagrowth={gamma_growth_factor}_step={step_size}.pt")
 
 
 if __name__ == "__main__":
+
     # train_cifar10(mixup="standard")
-    train_cifar10(mixup="weighted", gamma=0.5)
+    train_cifar10(mixup="weighted", gamma=0.25, step_size=20, gamma_growth_factor=1.5, mu=0.0)
+    train_cifar10(mixup="weighted", gamma=0.25, step_size=20, gamma_growth_factor=2, mu=0.0)
+    
+    train_cifar10(mixup="weighted", gamma=0.2, step_size=20, gamma_growth_factor=1.5, mu=0.0)
+    train_cifar10(mixup="weighted", gamma=0.2, step_size=20, gamma_growth_factor=2, mu=0.0)
+    
     # train_cifar10(mixup="weighted", gamma=0.25)
     # train_cifar10(mixup="weighted", gamma=0.125)
     # train_cifar10(mixup="weighted", gamma=1)
