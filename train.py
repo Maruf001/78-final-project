@@ -35,10 +35,10 @@ def train_cifar10(
     alpha=1.0,  # mixup interpolation coefficient
     gamma=0.125,  # weighted mixup regularizing coefficient
     mu=0.9,  # confusion matrix exponential moving average momentum
-    live=True,  # print live progress bar
+    live=False,  # print live progress bar
     resume_epoch=0,  # resume from epoch
     gamma_growth_factor=1.5,  # gamma multiplied by this factor every step_size epochs
-    step_size=20
+    step_size=20,
 ):
     if live:
         from utils import progress_bar
@@ -83,7 +83,6 @@ def train_cifar10(
         root="~/data", train=True, download=False, transform=transform_train
     )
 
-
     # Use a custom stratified data loaded to ensure that the class distribution is the same in each batch
     sampler = StratifiedSampler(trainset, batch_size=batch_size)
     trainloader = DataLoader(trainset, batch_sampler=sampler)
@@ -105,7 +104,7 @@ def train_cifar10(
         start_epoch = checkpoint["epoch"] + 1
         rng_state = checkpoint["rng_state"]
         torch.set_rng_state(rng_state)
-        gamma **= (start_epoch // step_size + 1)
+        gamma **= start_epoch // step_size + 1
     else:
         print("==> Building model..")
         net = models.__dict__[model]()
@@ -157,7 +156,8 @@ def train_cifar10(
         batch_size = x1.size()[0]
 
         # calculate current gamma
-        if epoch > 0 and epoch % step_size == 0: gamma *= gamma_growth_factor
+        if epoch > 0 and epoch % step_size == 0:
+            gamma *= gamma_growth_factor
 
         # Raise the confusion matrix to the power of gamma (element-wise) and normalize it
         matrix = cm**gamma
@@ -389,7 +389,10 @@ def train_cifar10(
             )
 
     # save the confusion matrices
-    torch.save(cms_tensor, f"results/cm_{name}_{model}_{mixup}_{gamma}_gammagrowth={gamma_growth_factor}_step={step_size}.pt")
+    torch.save(
+        cms_tensor,
+        f"results/cm_{name}_{model}_{mixup}_{gamma}_gammagrowth={gamma_growth_factor}_step={step_size}.pt",
+    )
 
 
 if __name__ == "__main__":
@@ -397,12 +400,40 @@ if __name__ == "__main__":
     # train_cifar10(mixup="standard")
 
     # exponential growth of gamma --> going from low to roughly 1 over training epochs
-    train_cifar10(mixup="weighted", gamma=0.25, step_size=20, gamma_growth_factor=1.5, mu=0.0)
-    train_cifar10(mixup="weighted", gamma=0.25, step_size=20, gamma_growth_factor=2, mu=0.0)
-    
-    train_cifar10(mixup="weighted", gamma=0.2, step_size=20, gamma_growth_factor=1.5, mu=0.0)
-    train_cifar10(mixup="weighted", gamma=0.2, step_size=20, gamma_growth_factor=2, mu=0.0)
-    
+    train_cifar10(
+        name="gamma-growth",
+        mixup="weighted",
+        gamma=0.25,
+        step_size=20,
+        gamma_growth_factor=1.5,
+        mu=0.0,
+    )
+    train_cifar10(
+        name="gamma-growth",
+        mixup="weighted",
+        gamma=0.25,
+        step_size=20,
+        gamma_growth_factor=2,
+        mu=0.0,
+    )
+
+    train_cifar10(
+        name="gamma-growth",
+        mixup="weighted",
+        gamma=0.2,
+        step_size=20,
+        gamma_growth_factor=1.5,
+        mu=0.0,
+    )
+    train_cifar10(
+        name="gamma-growth",
+        mixup="weighted",
+        gamma=0.2,
+        step_size=20,
+        gamma_growth_factor=2,
+        mu=0.0,
+    )
+
     # train_cifar10(mixup="weighted", gamma=0.25)
     # train_cifar10(mixup="weighted", gamma=0.125)
     # train_cifar10(mixup="weighted", gamma=1)

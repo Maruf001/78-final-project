@@ -35,11 +35,10 @@ def train_cifar100(
     alpha=1.0,  # mixup interpolation coefficient
     gamma=1.0,  # weighted mixup regularizing coefficient
     mu=0.9,  # confusion matrix exponential moving average momentum
-    live=True,  # print live progress bar
+    live=False,  # print live progress bar
     resume_epoch=0,  # resume from epoch
     gamma_growth_factor=1.5,  # gamma multiplied by this factor every step_size epochs
-    step_size=20
-
+    step_size=20,
 ):
     num_classes = 100
     if live:
@@ -106,14 +105,14 @@ def train_cifar100(
         start_epoch = checkpoint["epoch"] + 1
         rng_state = checkpoint["rng_state"]
         torch.set_rng_state(rng_state)
-        gamma **= (start_epoch // step_size + 1)
+        gamma **= start_epoch // step_size + 1
     else:
         print("==> Building model..")
         net = models.__dict__[model]()
 
-    if not os.path.isdir("results"):
-        os.mkdir("results")
-    logname = f"results/log_{name}_{model}_{mixup}_{gamma}.csv"
+    if not os.path.isdir("cifar100results"):
+        os.mkdir("cifar100results")
+    logname = f"cifar100results/log_{name}_{model}_{mixup}_{gamma}.csv"
 
     if use_cuda:
         net.cuda()
@@ -158,7 +157,8 @@ def train_cifar100(
         batch_size = x1.size()[0]
 
         # update gamma if it is time
-        if epoch > 0 and epoch % step_size == 0: gamma *= gamma_growth_factor
+        if epoch > 0 and epoch % step_size == 0:
+            gamma *= gamma_growth_factor
 
         # Raise the confusion matrix to the power of gamma (element-wise) and normalize it
         matrix = cm**gamma
@@ -390,19 +390,22 @@ def train_cifar100(
             )
 
     # save the confusion matrices
-    torch.save(cms_tensor, f"cifar100results/cm_{name}_{model}_{mixup}_{gamma}_gammagrowth={gamma_growth_factor}_step={step_size}.pt")
+    torch.save(
+        cms_tensor,
+        f"cifar100results/cm_{name}_{model}_{mixup}_{gamma}_gammagrowth={gamma_growth_factor}_step={step_size}.pt",
+    )
 
 
 if __name__ == "__main__":
-    train_cifar100(mixup="erm")
-    train_cifar100(mixup="standard")
-    train_cifar100(mixup="weighted", gamma=0.5)
-    train_cifar100(mixup="weighted", gamma=0.25)
-    train_cifar100(mixup="weighted", gamma=0.125)
-    train_cifar100(mixup="weighted", gamma=1)
-    train_cifar100(mixup="weighted", gamma=2)
-    train_cifar100(mixup="weighted", gamma=4)
-    train_cifar100(mixup="weighted", gamma=8)
+    # train_cifar100(mixup="weighted", mu=0.5, gamma=0.5)
+    # train_cifar100(mixup="weighted", mu=0.5, gamma=0.25)
+    # train_cifar100(mixup="erm")
+    # train_cifar100(mixup="standard")
+    # train_cifar100(mixup="weighted", mu=0.5, gamma=0.125)
+    # train_cifar100(mixup="weighted", mu=0.5, gamma=1)
+    # train_cifar100(mixup="weighted", mu=0.5, gamma=2)
+    # train_cifar100(mixup="weighted", mu=0.5, gamma=4)
+    # train_cifar100(mixup="weighted", mu=0.5, gamma=8)
 
     # train_cifar10(mixup="erm", name="decay1e-2", decay=1e-2)
     # train_cifar10(mixup="erm", name="decay1e-3", decay=1e-3)
