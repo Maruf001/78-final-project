@@ -111,7 +111,7 @@ def train_cifar10(
 
     if not os.path.isdir("results"):
         os.mkdir("results")
-    logname = f"results/log_{name}_{model}_{mixup}_{gamma}.csv"
+    logname = f"results/log_{name}_{model}_{mixup}_{gamma}_gammagrowth={gamma_growth_factor}_step={step_size}.csv"
 
     if use_cuda:
         net.cuda()
