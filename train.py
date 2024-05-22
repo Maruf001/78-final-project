@@ -398,42 +398,6 @@ def train_cifar10(
 if __name__ == "__main__":
 
     # train_cifar10(mixup="standard")
-
-    # exponential growth of gamma --> going from low to roughly 1 over training epochs
-    train_cifar10(
-        name="gamma-growth",
-        mixup="weighted",
-        gamma=0.25,
-        step_size=20,
-        gamma_growth_factor=1.5,
-        mu=0.0,
-    )
-    train_cifar10(
-        name="gamma-growth",
-        mixup="weighted",
-        gamma=0.25,
-        step_size=20,
-        gamma_growth_factor=2,
-        mu=0.0,
-    )
-
-    train_cifar10(
-        name="gamma-growth",
-        mixup="weighted",
-        gamma=0.2,
-        step_size=20,
-        gamma_growth_factor=1.5,
-        mu=0.0,
-    )
-    train_cifar10(
-        name="gamma-growth",
-        mixup="weighted",
-        gamma=0.2,
-        step_size=20,
-        gamma_growth_factor=2,
-        mu=0.0,
-    )
-
     # train_cifar10(mixup="weighted", gamma=0.25)
     # train_cifar10(mixup="weighted", gamma=0.125)
     # train_cifar10(mixup="weighted", gamma=1)
@@ -455,4 +419,9 @@ if __name__ == "__main__":
     # train_cifar10(mixup="standard", name="alpha02", alpha=0.2)
     # train_cifar10(mixup="weighted", name="mu05_alpha01", gamma=1, mu=0.5, alpha=0.1)
     # train_cifar10(mixup="standard", name="alpha01", alpha=0.1)
+    # exponential growth of gamma --> going from low to roughly 1 over training epochs
+    # train_cifar10(name="gamma-growth", mixup="weighted", gamma=0.25, step_size=20, gamma_growth_factor=1.5, mu=0.0)
+    # train_cifar10(name="gamma-growth", mixup="weighted", gamma=0.25, step_size=20, gamma_growth_factor=2, mu=0.0)
+    # train_cifar10(name="gamma-growth", mixup="weighted", gamma=0.2, step_size=20, gamma_growth_factor=1.5, mu=0.0)
+    # train_cifar10(name="gamma-growth", mixup="weighted", gamma=0.2, step_size=20, gamma_growth_factor=2, mu=0.0)
     pass
