@@ -397,15 +397,15 @@ def train_cifar100(
 
 
 if __name__ == "__main__":
-    # train_cifar100(mixup="weighted", mu=0.5, gamma=0.5)
-    # train_cifar100(mixup="weighted", mu=0.5, gamma=0.25)
+    train_cifar100(mixup="weighted", mu=0.5, gamma=0.5, gamma_growth_factor=1)
+    train_cifar100(mixup="weighted", mu=0.5, gamma=0.25, gamma_growth_factor=1)
     # train_cifar100(mixup="erm")
     # train_cifar100(mixup="standard")
-    # train_cifar100(mixup="weighted", mu=0.5, gamma=0.125)
-    # train_cifar100(mixup="weighted", mu=0.5, gamma=1)
-    # train_cifar100(mixup="weighted", mu=0.5, gamma=2)
-    # train_cifar100(mixup="weighted", mu=0.5, gamma=4)
-    # train_cifar100(mixup="weighted", mu=0.5, gamma=8)
+    train_cifar100(mixup="weighted", mu=0.5, gamma=0.125, gamma_growth_factor=1)
+    train_cifar100(mixup="weighted", mu=0.5, gamma=1, gamma_growth_factor=1)
+    train_cifar100(mixup="weighted", mu=0.5, gamma=2, gamma_growth_factor=1)
+    train_cifar100(mixup="weighted", mu=0.5, gamma=4, gamma_growth_factor=1)
+    train_cifar100(mixup="weighted", mu=0.5, gamma=8, gamma_growth_factor=1)
 
     # train_cifar10(mixup="erm", name="decay1e-2", decay=1e-2)
     # train_cifar10(mixup="erm", name="decay1e-3", decay=1e-3)
