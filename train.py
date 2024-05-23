@@ -34,11 +34,11 @@ def train_cifar10(
     mixup="standard",  # mixup type, either "standard", "weighted", or "erm"
     alpha=1.0,  # mixup interpolation coefficient
     gamma=0.125,  # weighted mixup regularizing coefficient
-    mu=0.9,  # confusion matrix exponential moving average momentum
+    mu=0.5,  # confusion matrix exponential moving average momentum
     live=False,  # print live progress bar
     resume_epoch=0,  # resume from epoch
-    gamma_growth_factor=1.5,  # gamma multiplied by this factor every step_size epochs
-    step_size=20,
+    gamma_growth_factor=1.0,  # gamma multiplied by this factor every step_size epochs
+    step_size=100,
 ):
     if live:
         from utils import progress_bar
