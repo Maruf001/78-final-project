@@ -407,14 +407,18 @@ if __name__ == "__main__":
     # train_cifar100(mixup="weighted", mu=0.5, gamma=4, gamma_growth_factor=1)
     # train_cifar100(mixup="weighted", mu=0.5, gamma=8, gamma_growth_factor=1)
 
-    train_cifar100(mixup="weighted", name="mu05", mu=0.5, gamma=0.063)
-    train_cifar100(mixup="weighted", name="mu05", mu=0.5, gamma=0.125)
-    train_cifar100(mixup="weighted", name="mu05", mu=0.5, gamma=0.177)
-    train_cifar100(mixup="weighted", name="mu05", mu=0.5, gamma=0.25)
-    train_cifar100(mixup="weighted", name="mu05", mu=0.5, gamma=0.354)
-    train_cifar100(mixup="weighted", name="mu05", mu=0.5, gamma=0.5)
-    train_cifar100(mixup="weighted", name="mu05", mu=0.5, gamma=0.707)
-    train_cifar100(mixup="weighted", name="mu05", mu=0.5, gamma=1)
-    train_cifar100(mixup="weighted", name="mu05", mu=0.5, gamma=1.414)
-    train_cifar100(mixup="weighted", name="mu05", mu=0.5, gamma=0.088)
+    # train_cifar100(mixup="weighted", name="mu05", mu=0.5, gamma=0.063)
+    # train_cifar100(mixup="weighted", name="mu05", mu=0.5, gamma=0.125)
+    # train_cifar100(mixup="weighted", name="mu05", mu=0.5, gamma=0.177)
+    # train_cifar100(mixup="weighted", name="mu05", mu=0.5, gamma=0.25)
+    # train_cifar100(mixup="weighted", name="mu05", mu=0.5, gamma=0.354)
+    # train_cifar100(mixup="weighted", name="mu05", mu=0.5, gamma=0.5)
+    # train_cifar100(mixup="weighted", name="mu05", mu=0.5, gamma=0.707)
+    # train_cifar100(mixup="weighted", name="mu05", mu=0.5, gamma=1)
+    # train_cifar100(mixup="weighted", name="mu05", mu=0.5, gamma=1.414)
+    # train_cifar100(mixup="weighted", name="mu05", mu=0.5, gamma=0.088)
+    # train_cifar100(mixup="weighted", name="mu05", mu=0.5, gamma=2)
+
     train_cifar100(mixup="weighted", name="mu05", mu=0.5, gamma=2)
+
+    pass
