@@ -418,7 +418,7 @@ if __name__ == "__main__":
     # train_cifar100(mixup="weighted", name="mu05", mu=0.5, gamma=1.414)
     # train_cifar100(mixup="weighted", name="mu05", mu=0.5, gamma=0.088)
     # train_cifar100(mixup="weighted", name="mu05", mu=0.5, gamma=2)
-
-    train_cifar100(mixup="weighted", name="mu05", mu=0.5, gamma=2)
+    # train_cifar100(mixup="weighted", name="mu05", mu=0.5, gamma=2)
+    train_cifar100(mixup="standard", name="1", seed=1)
 
     pass
