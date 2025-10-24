@@ -126,7 +126,7 @@ If you use this code, please cite the course paper:
 ```text
 @report{generalized_mixup_2025,
   title     = {From Confusion to Clarity – Generalized Mixup},
-  author    = {T. Simpson, H. Stropkay, A. Maruf, D. Mason, A. Johnson},
+  author    = {H. Stropkay, T. Simpson, A. Maruf, D. Mason, A. Johnson},
   year      = {2024},
   institution = {Dartmouth College},
   note      = {COSC278 – Deep Learning}
